@@ -1,0 +1,73 @@
+%%cuda
+#include <stdio.h>
+#include <stdlib.h>
+
+#define ARRAY_SIZE 100
+#define THREADS_PER_BLOCK 32
+
+__global__ void insertionSort(int *arr, int n) {
+
+    for(int i=0;i<n; i++) {
+        int key = arr[i];
+        int j = i - 1;
+
+        // Move elements of arr[0..i-1], that are greater than key, to one position ahead of their current position
+        while (j >= 0 && arr[j] > key) {
+            arr[j + 1] = arr[j];
+            j = j - 1;
+        }
+        arr[j + 1] = key;
+    }
+}
+
+int main() {
+    int *arr, *d_arr;
+    int size = ARRAY_SIZE * sizeof(int);
+
+    arr = (int*)malloc(size);
+    cudaMalloc((void**)&d_arr, size);
+
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        arr[i] = rand() % 100;
+    }
+
+    printf("Original array:\n");
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaMemcpy(d_arr, arr, size, cudaMemcpyHostToDevice);
+
+    int blocks = 256;
+
+    cudaEventRecord(start);
+
+    // Launch kernel
+    insertionSort<<<blocks, THREADS_PER_BLOCK>>>(d_arr, ARRAY_SIZE);
+
+    cudaEventRecord(stop);
+
+    cudaEventSynchronize(stop);
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaMemcpy(arr, d_arr, size, cudaMemcpyDeviceToHost);
+
+    printf("\nSorted array:\n");
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+  printf("Runtime: %.2f ms\n", milliseconds);
+
+    free(arr);
+    cudaFree(d_arr);
+
+    return 0;
+}
